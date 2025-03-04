@@ -28,10 +28,9 @@ def fetch_data():
 
     #Combine all the data belonging to the conversation_id into a single line.
     grouped = df_cleaned.groupby("ConversationId").apply(
-        lambda x: ",".join(x.sort_values(by="Timestamp")["Message"])
-    ).reset_index()
-
+    lambda x: ",".join(x.sort_values(by="Timestamp")["Message"].apply(extract_text))).reset_index()
     grouped.columns = ["ConversationId", "CombinedMessages"]
+    grouped = pd.DataFrame(grouped)
     # grouped.to_pickle("combined_conversations_final.pkl")
 
     return grouped
