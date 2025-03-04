@@ -1,6 +1,6 @@
 from connection_details import get_connected
 import pandas as pd
-
+import json
 
 def fetch_data():
     connection=get_connected()
@@ -10,8 +10,10 @@ def fetch_data():
     incoming = cursor.fetchall()
     cursor.execute("SELECT conversationId, message, conversationoutgoingtime FROM conversationoutgoing")
     outgoing = cursor.fetchall()
+
     cursor.close()
     connection.close()
+
     df_incoming = pd.DataFrame(incoming, columns=["ConversationId", "Message", "Timestamp"])
     df_outgoing = pd.DataFrame(outgoing, columns=["ConversationId", "Message", "Timestamp"])
 
@@ -34,22 +36,49 @@ def fetch_data():
 
     return grouped
 
+def fetch_data_by_id(id : int):
+    connection=get_connected()
+    cursor = connection.cursor()
+
+    cursor.execute(f"SELECT conversationId, message, conversationincomingtime FROM conversationincoming where conversationId={id}")
+    incoming = cursor.fetchall()
+    cursor.execute(f"SELECT conversationId, message, conversationoutgoingtime FROM conversationoutgoing where conversationId={id}")
+    outgoing = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    df_incoming = pd.DataFrame(incoming, columns=["ConversationId", "Message", "Timestamp"])
+    df_outgoing = pd.DataFrame(outgoing, columns=["ConversationId", "Message", "Timestamp"])
+
+    # Combine the DataFrames
+    df_combined = pd.concat([df_incoming, df_outgoing], ignore_index=True)
+
+    df_cleaned = df_combined.dropna(subset=["Message"])
+
+    grouped = df_cleaned.groupby("ConversationId").apply(
+    lambda x: ",".join(x.sort_values(by="Timestamp")["Message"].apply(extract_text))).reset_index()
+    grouped.columns = ["ConversationId", "CombinedMessages"]
+    grouped = pd.DataFrame(grouped)
+
+    return grouped
+
+
 def search_by_id(conversationid : int, flag :bool):
     try :
-        if flag=="true":
+        if flag:
             try:
-                print("hello")
-                df=fetch_data()
-                print(df)
+                # df=fetch_data()
+                df=fetch_data_by_id(conversationid)
             except Exception as e:
                 print(f"Data fetch error: {e}")
                 return {"message": "Cannot load the data from the server"}
         else :
+            print("pickle\n\n\n\n")
             df = pd.read_pickle("combined_conversations_final.pkl")
 
         result = df[df["ConversationId"] == conversationid]
-        print(result)
-        # Print the combined message
+        print("Result :",result)
         if not result.empty:
             return result["CombinedMessages"].values[0]
         else:
@@ -57,5 +86,12 @@ def search_by_id(conversationid : int, flag :bool):
     except Exception as e:
         print(f"Data processing error: {e}")
         return {"message" : "Data could not be fetched at this moment please try again later"}
+    
 
-
+def extract_text(message):
+    try:
+        message_list = json.loads(message)
+        if isinstance(message_list, list) and len(message_list) > 0:
+            return message_list[0].get('text', '')
+    except json.JSONDecodeError:
+        return message

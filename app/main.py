@@ -9,6 +9,7 @@ app = FastAPI()
 def classify_conversation(conversationid: int, fetch_data : bool):
     try :
         conversation = search_by_id(conversationid,fetch_data)
+        print(conversation)
         if isinstance(conversation, dict) and "message" in conversation:
             return conversation
         try :
