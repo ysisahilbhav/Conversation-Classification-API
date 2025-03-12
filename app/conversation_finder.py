@@ -16,7 +16,7 @@ def fetch_data():
 
     df_incoming = pd.DataFrame(incoming, columns=["ConversationId", "Message", "Timestamp"])
     df_outgoing = pd.DataFrame(outgoing, columns=["ConversationId", "Message", "Timestamp"])
-
+    print("No error n database")
     # Combine the DataFrames
     df_combined = pd.concat([df_incoming, df_outgoing], ignore_index=True)
 
@@ -25,13 +25,14 @@ def fetch_data():
     df_combined.sort_values(by=["ConversationId", "Timestamp"], inplace=True)
    
     df_cleaned = df_combined.dropna(subset=["Message"])
-
+    print("Database cleaned")
     #Combine all the data belonging to the conversation_id into a single line.
     grouped = df_cleaned.groupby("ConversationId").apply(
     lambda x: ",".join(x.sort_values(by="Timestamp")["Message"].apply(extract_text))).reset_index()
+    print("Error in groupby")
     grouped.columns = ["ConversationId", "CombinedMessages"]
-    grouped = pd.DataFrame(grouped)
-    # grouped.to_pickle("combined_conversations_final.pkl")
+    # grouped = pd.DataFrame(grouped)
+    grouped.to_pickle("combined_conversations_final.pkl")
 
     return grouped
 
@@ -50,16 +51,32 @@ def fetch_data_by_id(id : int):
     df_incoming = pd.DataFrame(incoming, columns=["ConversationId", "Message", "Timestamp"])
     df_outgoing = pd.DataFrame(outgoing, columns=["ConversationId", "Message", "Timestamp"])
 
+    # Apply extract_text to the messages
+    df_incoming["Message"] = df_incoming["Message"].apply(extract_text)
+    df_outgoing["Message"] = df_outgoing["Message"].apply(extract_text)
+
+    # Add labels to the messages
+    df_incoming["Message"] = "user : " + df_incoming["Message"]
+    df_outgoing["Message"] = "bot : " + df_outgoing["Message"]
+
     # Combine the DataFrames
     df_combined = pd.concat([df_incoming, df_outgoing], ignore_index=True)
 
     df_cleaned = df_combined.dropna(subset=["Message"])
-
+    print(df_cleaned)
+    # grouped = df_cleaned.groupby("ConversationId").apply(
+    # lambda x: ",".join(x.sort_values(by="Timestamp")["Message"].apply(extract_text))).reset_index()
     grouped = df_cleaned.groupby("ConversationId").apply(
-    lambda x: ",".join(x.sort_values(by="Timestamp")["Message"].apply(extract_text))).reset_index()
+    lambda x: ",".join(
+        x.sort_values(by="Timestamp")["Message"]
+        .dropna()  # This line filters out None values
+    )
+).reset_index()
+   
     grouped.columns = ["ConversationId", "CombinedMessages"]
-    grouped = pd.DataFrame(grouped)
 
+    grouped = pd.DataFrame(grouped)
+    print(grouped)
     return grouped
 
 
@@ -71,13 +88,13 @@ def search_by_id(conversationid : int, flag :bool):
                 df=fetch_data_by_id(conversationid)
             except Exception as e:
                 print(f"Data fetch error: {e}")
-                return {"message": "Cannot load the data from the server"}
+                return {"message" : f"No conversation found with ConversationId - {conversationid}"}
         else :
             print("pickle\n\n\n\n")
             df = pd.read_pickle("combined_conversations_final.pkl")
-
-        result = df[df["ConversationId"] == conversationid]
-        print("Result :",result)
+        result=df
+        # result = df[df["ConversationId"] == conversationid]
+  
         if not result.empty:
             return result["CombinedMessages"].values[0]
         else:
