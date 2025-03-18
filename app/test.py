@@ -105,7 +105,7 @@ def gpt_api(data : str):
                 ]
             }
         ],
-        max_tokens=300
+        max_tokens=500
     )
 
     label = response.choices[0].message.content
